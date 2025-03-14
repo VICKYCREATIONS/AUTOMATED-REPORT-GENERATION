@@ -1,0 +1,90 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from datetime import datetime
+
+def create_dummy_csv(file_path):
+    data = {
+        "Date": ["2024-03-01", "2024-03-02", "2024-03-03", "2024-03-04", "2024-03-05"],
+        "Sales": [100, 150, 200, 250, 300]
+    }
+    df = pd.DataFrame(data)
+    df.to_csv(file_path, index=False)
+    print(f"Dummy CSV created: {file_path}")
+
+def load_data(file_path):
+    if not os.path.exists(file_path):
+        print("File not found. Creating a dummy CSV...")
+        create_dummy_csv(file_path)
+    try:
+        data = pd.read_csv(file_path)
+        if data.empty:
+            print("Error: File is empty.")
+            return None
+        return data
+    except pd.errors.ParserError:
+        print("Error: File could not be parsed.")
+        return None
+
+def generate_plot(data, x_column, y_column, plot_filename):
+    if x_column not in data.columns or y_column not in data.columns:
+        print("Error: Specified columns not found in data.")
+        return False
+    
+    plt.figure(figsize=(10, 5))
+    plt.plot(data[x_column], data[y_column], marker='o', linestyle='-', label=y_column)
+    plt.xlabel(x_column)
+    plt.ylabel(y_column)
+    plt.title(f"{y_column} Trend")
+    plt.legend()
+    plt.grid()
+    plt.xticks(rotation=45)
+    plt.savefig(plot_filename)
+    plt.close()
+    return True
+
+def generate_pdf_report(data, x_column, y_column, report_title, plot_filename, pdf_filename):
+    c = canvas.Canvas(pdf_filename, pagesize=letter)
+    width, height = letter
+    
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(200, height - 50, report_title)
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 80, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    c.drawString(50, height - 110, "Recent Data:")
+    y_pos = height - 130
+    
+    for index, row in data.tail(5).iterrows():
+        c.drawString(50, y_pos, f"{row[x_column]}: {y_column} = {row[y_column]}")
+        y_pos -= 20
+    
+    if os.path.exists(plot_filename) and y_pos - 200 > 50:
+        c.drawImage(plot_filename, 50, y_pos - 200, width=500, height=200)
+    else:
+        print("Warning: Not enough space to insert the plot in the PDF or plot file missing.")
+    
+    c.save()
+    print(f"Report saved as {pdf_filename}")
+
+def main():
+    file_path = "data.csv"
+    x_column = "Date"
+    y_column = "Sales"
+    plot_filename = "report_plot.png"
+    pdf_filename = "custom_report.pdf"
+    report_title = "Automated Sales Report"
+    
+    data = load_data(file_path)
+    if data is None:
+        return
+    
+    if generate_plot(data, x_column, y_column, plot_filename):
+        generate_pdf_report(data, x_column, y_column, report_title, plot_filename, pdf_filename)
+    else:
+        print("Error: Plot generation failed. PDF report will not be created.")
+
+if __name__ == "__main__":
+    main()
